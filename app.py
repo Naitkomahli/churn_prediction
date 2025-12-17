@@ -1,143 +1,131 @@
-{
- "cells": [
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "b092b647",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "import streamlit as st\n",
-    "import pandas as pd\n",
-    "import joblib\n",
-    "import numpy as np\n",
-    "\n",
-    "# --- 1. CONFIGURATION ---\n",
-    "st.set_page_config(page_title=\"Telco Churn Prediction\", page_icon=\"📱\")\n",
-    "\n",
-    "# --- 2. LOAD MODEL & ARTIFACTS ---\n",
-    "@st.cache_resource\n",
-    "def load_artifacts():\n",
-    "    # Pastikan file 'churn_model.pkl' ada di folder yang sama\n",
-    "    artifacts = joblib.load('churn_model.pkl')\n",
-    "    return artifacts['model'], artifacts['scaler'], artifacts['features']\n",
-    "\n",
-    "try:\n",
-    "    model, scaler, feature_columns = load_artifacts()\n",
-    "except FileNotFoundError:\n",
-    "    st.error(\"File 'churn_model.pkl' tidak ditemukan. Pastikan file model ada di direktori yang sama.\")\n",
-    "    st.stop()\n",
-    "\n",
-    "# --- 3. UI: TITLE & DESCRIPTION ---\n",
-    "st.title(\"📱 Prediksi Churn Pelanggan Telco\")\n",
-    "st.write(\"\"\"\n",
-    "Aplikasi ini menggunakan Machine Learning untuk memprediksi apakah pelanggan akan **Churn** (berhenti berlangganan) atau **Tidak**.\n",
-    "Silakan isi parameter pelanggan di sidebar atau formulir di bawah ini.\n",
-    "\"\"\")\n",
-    "\n",
-    "# --- 4. INPUT FORM ---\n",
-    "with st.form(\"churn_form\"):\n",
-    "    st.subheader(\"Data Pelanggan\")\n",
-    "    \n",
-    "    col1, col2 = st.columns(2)\n",
-    "    \n",
-    "    with col1:\n",
-    "        # Fitur Numerik\n",
-    "        tenure = st.number_input(\"Lama Berlangganan (Bulan)\", min_value=0, max_value=100, value=12)\n",
-    "        monthly_charges = st.number_input(\"Biaya Bulanan ($)\", min_value=0.0, value=50.0)\n",
-    "        total_charges = st.number_input(\"Total Biaya ($)\", min_value=0.0, value=500.0)\n",
-    "        \n",
-    "        # Fitur Demografis\n",
-    "        gender = st.selectbox(\"Gender\", [\"Male\", \"Female\"])\n",
-    "        senior_citizen = st.selectbox(\"Senior Citizen\", [\"No\", \"Yes\"])\n",
-    "        partner = st.selectbox(\"Memiliki Partner\", [\"Yes\", \"No\"])\n",
-    "        dependents = st.selectbox(\"Memiliki Tanggungan\", [\"Yes\", \"No\"])\n",
-    "\n",
-    "    with col2:\n",
-    "        # Fitur Layanan\n",
-    "        phone_service = st.selectbox(\"Layanan Telepon\", [\"Yes\", \"No\"])\n",
-    "        multiple_lines = st.selectbox(\"Multiple Lines\", [\"No\", \"Yes\", \"No phone service\"])\n",
-    "        internet_service = st.selectbox(\"Internet Service\", [\"DSL\", \"Fiber optic\", \"No\"])\n",
-    "        online_security = st.selectbox(\"Online Security\", [\"No\", \"Yes\", \"No internet service\"])\n",
-    "        tech_support = st.selectbox(\"Tech Support\", [\"No\", \"Yes\", \"No internet service\"])\n",
-    "        contract = st.selectbox(\"Kontrak\", [\"Month-to-month\", \"One year\", \"Two year\"])\n",
-    "        paperless_billing = st.selectbox(\"Paperless Billing\", [\"Yes\", \"No\"])\n",
-    "        payment_method = st.selectbox(\"Metode Pembayaran\", [\n",
-    "            \"Electronic check\", \"Mailed check\", \"Bank transfer (automatic)\", \"Credit card (automatic)\"\n",
-    "        ])\n",
-    "        \n",
-    "        # Fitur Tambahan (jika diperlukan oleh model, sesuaikan dengan fitur X_prep Anda)\n",
-    "        # Untuk input yang tidak ada di form tapi ada di data training, kita set default\n",
-    "        device_protection = st.selectbox(\"Device Protection\", [\"No\", \"Yes\", \"No internet service\"])\n",
-    "        online_backup = st.selectbox(\"Online Backup\", [\"No\", \"Yes\", \"No internet service\"])\n",
-    "        streaming_tv = st.selectbox(\"Streaming TV\", [\"No\", \"Yes\", \"No internet service\"])\n",
-    "        streaming_movies = st.selectbox(\"Streaming Movies\", [\"No\", \"Yes\", \"No internet service\"])\n",
-    "\n",
-    "    submitted = st.form_submit_button(\"Prediksi Sekarang\")\n",
-    "\n",
-    "# --- 5. PREDICTION LOGIC ---\n",
-    "if submitted:\n",
-    "    # A. Buat DataFrame dari Input\n",
-    "    raw_data = {\n",
-    "        'gender': gender,\n",
-    "        'SeniorCitizen': 1 if senior_citizen == 'Yes' else 0,\n",
-    "        'Partner': partner,\n",
-    "        'Dependents': dependents,\n",
-    "        'tenure': tenure,\n",
-    "        'PhoneService': phone_service,\n",
-    "        'MultipleLines': multiple_lines,\n",
-    "        'InternetService': internet_service,\n",
-    "        'OnlineSecurity': online_security,\n",
-    "        'OnlineBackup': online_backup,\n",
-    "        'DeviceProtection': device_protection,\n",
-    "        'TechSupport': tech_support,\n",
-    "        'StreamingTV': streaming_tv,\n",
-    "        'StreamingMovies': streaming_movies,\n",
-    "        'Contract': contract,\n",
-    "        'PaperlessBilling': paperless_billing,\n",
-    "        'PaymentMethod': payment_method,\n",
-    "        'MonthlyCharges': monthly_charges,\n",
-    "        'TotalCharges': total_charges\n",
-    "    }\n",
-    "    \n",
-    "    input_df = pd.DataFrame([raw_data])\n",
-    "\n",
-    "    # B. Preprocessing - Scaling Numerik\n",
-    "    num_cols = ['tenure', 'MonthlyCharges', 'TotalCharges']\n",
-    "    input_df[num_cols] = scaler.transform(input_df[num_cols])\n",
-    "\n",
-    "    # C. Preprocessing - Encoding\n",
-    "    # Kita lakukan get_dummies pada input\n",
-    "    input_encoded = pd.get_dummies(input_df, drop_first=True)\n",
-    "\n",
-    "    # D. Align Columns (PENTING!)\n",
-    "    # Menyamakan kolom input dengan kolom training.\n",
-    "    # Jika ada kolom kurang (karena input tertentu tidak terpilih), isi dengan 0.\n",
-    "    # Jika ada kolom berlebih, buang.\n",
-    "    input_encoded = input_encoded.reindex(columns=feature_columns, fill_value=0)\n",
-    "\n",
-    "    # E. Prediksi\n",
-    "    prediction = model.predict(input_encoded)[0]\n",
-    "    probability = model.predict_proba(input_encoded)[0][1]\n",
-    "\n",
-    "    # --- 6. DISPLAY RESULT ---\n",
-    "    st.markdown(\"---\")\n",
-    "    st.subheader(\"Hasil Prediksi\")\n",
-    "    \n",
-    "    if prediction == 1:\n",
-    "        st.error(f\"⚠️ **CHURN DETECTED** (Probabilitas: {probability:.2%})\")\n",
-    "        st.write(\"Pelanggan ini berisiko tinggi untuk berhenti berlangganan.\")\n",
-    "    else:\n",
-    "        st.success(f\"✅ **NOT CHURN** (Probabilitas: {probability:.2%})\")\n",
-    "        st.write(\"Pelanggan ini diprediksi akan tetap setia.\")"
-   ]
-  }
- ],
- "metadata": {
-  "language_info": {
-   "name": "python"
-  }
- },
- "nbformat": 4,
- "nbformat_minor": 5
-}
+import streamlit as st
+import pandas as pd
+import joblib
+import numpy as np
+
+# --- 1. CONFIGURATION ---
+st.set_page_config(page_title="Telco Churn Prediction", page_icon="📱")
+
+# --- 2. LOAD MODEL & ARTIFACTS ---
+@st.cache_resource
+def load_artifacts():
+    # Pastikan file 'churn_model.pkl' ada di folder yang sama
+    # Jika di Streamlit Cloud error file not found, pastikan nama file persis sama (case-sensitive)
+    try:
+        artifacts = joblib.load('churn_model.pkl')
+        return artifacts['model'], artifacts['scaler'], artifacts['features']
+    except FileNotFoundError:
+        return None, None, None
+
+model, scaler, feature_columns = load_artifacts()
+
+if model is None:
+    st.error("Error: File 'churn_model.pkl' tidak ditemukan. Pastikan file tersebut sudah di-upload ke GitHub di folder yang sama dengan app.py.")
+    st.stop()
+
+# --- 3. UI: TITLE & DESCRIPTION ---
+st.title("📱 Prediksi Churn Pelanggan Telco")
+st.write("""
+Aplikasi ini menggunakan Machine Learning untuk memprediksi apakah pelanggan akan **Churn** (berhenti berlangganan) atau **Tidak**.
+Silakan isi parameter pelanggan di bawah ini.
+""")
+
+# --- 4. INPUT FORM ---
+with st.form("churn_form"):
+    st.subheader("Data Pelanggan")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Fitur Numerik
+        tenure = st.number_input("Lama Berlangganan (Bulan)", min_value=0, max_value=100, value=12)
+        monthly_charges = st.number_input("Biaya Bulanan ($)", min_value=0.0, value=50.0)
+        total_charges = st.number_input("Total Biaya ($)", min_value=0.0, value=500.0)
+        
+        # Fitur Demografis
+        gender = st.selectbox("Gender", ["Male", "Female"])
+        senior_citizen = st.selectbox("Senior Citizen", ["No", "Yes"])
+        partner = st.selectbox("Memiliki Partner", ["Yes", "No"])
+        dependents = st.selectbox("Memiliki Tanggungan", ["Yes", "No"])
+
+    with col2:
+        # Fitur Layanan
+        phone_service = st.selectbox("Layanan Telepon", ["Yes", "No"])
+        multiple_lines = st.selectbox("Multiple Lines", ["No", "Yes", "No phone service"])
+        internet_service = st.selectbox("Internet Service", ["DSL", "Fiber optic", "No"])
+        online_security = st.selectbox("Online Security", ["No", "Yes", "No internet service"])
+        tech_support = st.selectbox("Tech Support", ["No", "Yes", "No internet service"])
+        contract = st.selectbox("Kontrak", ["Month-to-month", "One year", "Two year"])
+        paperless_billing = st.selectbox("Paperless Billing", ["Yes", "No"])
+        payment_method = st.selectbox("Metode Pembayaran", [
+            "Electronic check", "Mailed check", "Bank transfer (automatic)", "Credit card (automatic)"
+        ])
+        
+        # Fitur Tambahan (Default value untuk fitur yang mungkin tidak ada di form tapi ada di model)
+        device_protection = "No" 
+        online_backup = "No"
+        streaming_tv = "No"
+        streaming_movies = "No"
+
+    submitted = st.form_submit_button("Prediksi Sekarang")
+
+# --- 5. PREDICTION LOGIC ---
+if submitted:
+    # A. Buat DataFrame dari Input
+    raw_data = {
+        'gender': gender,
+        'SeniorCitizen': 1 if senior_citizen == 'Yes' else 0,
+        'Partner': partner,
+        'Dependents': dependents,
+        'tenure': tenure,
+        'PhoneService': phone_service,
+        'MultipleLines': multiple_lines,
+        'InternetService': internet_service,
+        'OnlineSecurity': online_security,
+        'OnlineBackup': online_backup,
+        'DeviceProtection': device_protection,
+        'TechSupport': tech_support,
+        'StreamingTV': streaming_tv,
+        'StreamingMovies': streaming_movies,
+        'Contract': contract,
+        'PaperlessBilling': paperless_billing,
+        'PaymentMethod': payment_method,
+        'MonthlyCharges': monthly_charges,
+        'TotalCharges': total_charges
+    }
+    
+    input_df = pd.DataFrame([raw_data])
+
+    # B. Preprocessing - Scaling Numerik
+    num_cols = ['tenure', 'MonthlyCharges', 'TotalCharges']
+    try:
+        input_df[num_cols] = scaler.transform(input_df[num_cols])
+    except Exception as e:
+        st.error(f"Terjadi kesalahan saat scaling data: {e}")
+        st.stop()
+
+    # C. Preprocessing - Encoding
+    input_encoded = pd.get_dummies(input_df, drop_first=True)
+
+    # D. Align Columns (PENTING!)
+    # Menyamakan kolom input dengan kolom training
+    input_encoded = input_encoded.reindex(columns=feature_columns, fill_value=0)
+
+    # E. Prediksi
+    try:
+        prediction = model.predict(input_encoded)[0]
+        probability = model.predict_proba(input_encoded)[0][1]
+
+        # --- 6. DISPLAY RESULT ---
+        st.markdown("---")
+        st.subheader("Hasil Prediksi")
+        
+        if prediction == 1:
+            st.error(f"⚠️ **CHURN DETECTED** (Probabilitas: {probability:.2%})")
+            st.write("Pelanggan ini berisiko tinggi untuk berhenti berlangganan.")
+        else:
+            st.success(f"✅ **NOT CHURN** (Probabilitas: {probability:.2%})")
+            st.write("Pelanggan ini diprediksi akan tetap setia.")
+            
+    except Exception as e:
+        st.error(f"Terjadi kesalahan saat melakukan prediksi: {e}")
