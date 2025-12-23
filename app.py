@@ -29,48 +29,47 @@ This app uses Machine Learning to predict whether a customer will **Churn** (sto
 Please fill in the customer parameters below.
 """)
 
-# --- 4. INPUT FORM ---
+# --- 4. INPUT FORM (YANG SUDAH DIPERBAIKI) ---
 with st.form("churn_form"):
-    st.subheader("Customer Data")
+    st.subheader("Data Pelanggan")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        # Numeric Features (Matched with CSV columns: tenure, MonthlyCharges, TotalCharges)
-        tenure = st.number_input("Tenure (Months)", min_value=0, max_value=100, value=12)
-        monthly_charges = st.number_input("Monthly Charges ($)", min_value=0.0, value=50.0)
-        total_charges = st.number_input("Total Charges ($)", min_value=0.0, value=500.0)
+        # Fitur Numerik
+        tenure = st.number_input("Lama Berlangganan (Bulan)", min_value=0, max_value=100, value=12)
+        monthly_charges = st.number_input("Biaya Bulanan ($)", min_value=0.0, value=50.0)
+        total_charges = st.number_input("Total Biaya ($)", min_value=0.0, value=500.0)
         
-        # Demographic Features
+        # Fitur Demografis
         gender = st.selectbox("Gender", ["Male", "Female"])
         senior_citizen = st.selectbox("Senior Citizen", ["No", "Yes"])
-        partner = st.selectbox("Partner", ["Yes", "No"])
-        dependents = st.selectbox("Dependents", ["Yes", "No"])
+        partner = st.selectbox("Memiliki Partner", ["Yes", "No"])
+        dependents = st.selectbox("Memiliki Tanggungan", ["Yes", "No"])
 
     with col2:
-        # Service Features
-        phone_service = st.selectbox("Phone Service", ["Yes", "No"])
+        # Fitur Layanan (LENGKAP)
+        phone_service = st.selectbox("Layanan Telepon", ["Yes", "No"])
         multiple_lines = st.selectbox("Multiple Lines", ["No", "Yes", "No phone service"])
         internet_service = st.selectbox("Internet Service", ["DSL", "Fiber optic", "No"])
         online_security = st.selectbox("Online Security", ["No", "Yes", "No internet service"])
+        online_backup = st.selectbox("Online Backup", ["No", "Yes", "No internet service"]) # DITAMBAHKAN
+        device_protection = st.selectbox("Device Protection", ["No", "Yes", "No internet service"]) # DITAMBAHKAN
         tech_support = st.selectbox("Tech Support", ["No", "Yes", "No internet service"])
-        contract = st.selectbox("Contract", ["Month-to-month", "One year", "Two year"])
+        streaming_tv = st.selectbox("Streaming TV", ["No", "Yes", "No internet service"]) # DITAMBAHKAN
+        streaming_movies = st.selectbox("Streaming Movies", ["No", "Yes", "No internet service"]) # DITAMBAHKAN
+        
+        contract = st.selectbox("Kontrak", ["Month-to-month", "One year", "Two year"])
         paperless_billing = st.selectbox("Paperless Billing", ["Yes", "No"])
-        payment_method = st.selectbox("Payment Method", [
+        payment_method = st.selectbox("Metode Pembayaran", [
             "Electronic check", "Mailed check", "Bank transfer (automatic)", "Credit card (automatic)"
         ])
-        
-        # Additional Features (Default values for features present in CSV but not in form)
-        device_protection = "No" 
-        online_backup = "No"
-        streaming_tv = "No"
-        streaming_movies = "No"
 
-    submitted = st.form_submit_button("Predict Now")
+    submitted = st.form_submit_button("Prediksi Sekarang")
 
-# --- 5. PREDICTION LOGIC ---
+# --- 5. PREDICTION LOGIC (YANG SUDAH DIPERBAIKI) ---
 if submitted:
-    # A. Create DataFrame from Input
+    # A. Buat DataFrame
     raw_data = {
         'gender': gender,
         'SeniorCitizen': 1 if senior_citizen == 'Yes' else 0,
@@ -81,11 +80,11 @@ if submitted:
         'MultipleLines': multiple_lines,
         'InternetService': internet_service,
         'OnlineSecurity': online_security,
-        'OnlineBackup': online_backup,
-        'DeviceProtection': device_protection,
+        'OnlineBackup': online_backup,        # Nilai dari form
+        'DeviceProtection': device_protection, # Nilai dari form
         'TechSupport': tech_support,
-        'StreamingTV': streaming_tv,
-        'StreamingMovies': streaming_movies,
+        'StreamingTV': streaming_tv,          # Nilai dari form
+        'StreamingMovies': streaming_movies,  # Nilai dari form
         'Contract': contract,
         'PaperlessBilling': paperless_billing,
         'PaymentMethod': payment_method,
@@ -95,36 +94,35 @@ if submitted:
     
     input_df = pd.DataFrame([raw_data])
 
-    # B. Preprocessing - Scaling Numeric
+    # B. Scaling
     num_cols = ['tenure', 'MonthlyCharges', 'TotalCharges']
     try:
         input_df[num_cols] = scaler.transform(input_df[num_cols])
     except Exception as e:
-        st.error(f"An error occurred during data scaling: {e}")
+        st.error(f"Error scaling: {e}")
         st.stop()
 
-    # C. Preprocessing - Encoding
+    # C. Encoding - PERBAIKAN PENTING DI SINI
+    # Gunakan drop_first=False agar data tidak hilang saat prediksi single row
     input_encoded = pd.get_dummies(input_df, drop_first=False)
 
-    # D. Align Columns (IMPORTANT!)
-    # Match input columns with training columns
+    # D. Align Columns
     input_encoded = input_encoded.reindex(columns=feature_columns, fill_value=0)
 
-    # E. Prediction
+    # E. Prediksi
     try:
         prediction = model.predict(input_encoded)[0]
         probability = model.predict_proba(input_encoded)[0][1]
 
-        # --- 6. DISPLAY RESULT ---
         st.markdown("---")
-        st.subheader("Prediction Result")
+        st.subheader("Hasil Prediksi")
         
         if prediction == 1:
-            st.error(f"⚠️ **CHURN DETECTED** (Probability: {probability:.2%})")
-            st.write("This customer is at high risk of churning.")
+            st.error(f"⚠️ **CHURN DETECTED** (Probabilitas: {probability:.2%})")
+            st.write("Pelanggan berisiko churn.")
         else:
-            st.success(f"✅ **NOT CHURN** (Probability: {probability:.2%})")
-            st.write("This customer is predicted to stay.")
+            st.success(f"✅ **NOT CHURN** (Probabilitas: {probability:.2%})")
+            st.write("Pelanggan diprediksi aman.")
             
     except Exception as e:
-        st.error(f"An error occurred during prediction: {e}")
+        st.error(f"Error prediction: {e}")
