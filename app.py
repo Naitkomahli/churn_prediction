@@ -104,7 +104,7 @@ if submitted:
         st.stop()
 
     # C. Preprocessing - Encoding
-    input_encoded = pd.get_dummies(input_df, drop_first=True)
+    input_encoded = pd.get_dummies(input_df, drop_first=False)
 
     # D. Align Columns (IMPORTANT!)
     # Match input columns with training columns
