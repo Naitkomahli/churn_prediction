@@ -3,14 +3,11 @@ import pandas as pd
 import joblib
 import numpy as np
 
-# --- 1. CONFIGURATION ---
 st.set_page_config(page_title="Telco Churn Prediction", page_icon="📱")
 
-# --- 2. LOAD MODEL & ARTIFACTS ---
 @st.cache_resource
 def load_artifacts():
     try:
-        # Load the model artifacts
         artifacts = joblib.load('churn_model.pkl')
         return artifacts['model'], artifacts['scaler'], artifacts['features']
     except FileNotFoundError:
@@ -22,14 +19,12 @@ if model is None:
     st.error("Error: 'churn_model.pkl' not found. Please ensure the file is uploaded to the same folder as app.py.")
     st.stop()
 
-# --- 3. UI: TITLE & DESCRIPTION ---
 st.title("📱 Telco Customer Churn Prediction")
 st.write("""
 This application uses Machine Learning to predict whether a customer will **Churn** (cancel subscription) or **Stay**.
 Please fill in the customer details below.
 """)
 
-# --- 4. INPUT FORM ---
 with st.form("churn_form"):
     st.subheader("Customer Details")
     
@@ -45,8 +40,6 @@ with st.form("churn_form"):
         phone_service = st.selectbox("Phone Service", ["Yes", "No"])
         multiple_lines = st.selectbox("Multiple Lines", ["No", "Yes", "No phone service"])
         internet_service = st.selectbox("Internet Service", ["DSL", "Fiber optic", "No"])
-        
-        
 
     with col2:
 
@@ -66,9 +59,7 @@ with st.form("churn_form"):
 
     submitted = st.form_submit_button("Predict Now")
 
-# --- 5. PREDICTION LOGIC ---
 if submitted:
-    # A. Create DataFrame from Input
     raw_data = {
         'gender': gender,
         'SeniorCitizen': 1 if senior_citizen == 'Yes' else 0,
@@ -93,7 +84,6 @@ if submitted:
     
     input_df = pd.DataFrame([raw_data])
 
-    # B. Preprocessing - Scaling Numeric Features
     num_cols = ['tenure', 'MonthlyCharges', 'TotalCharges']
     try:
         input_df[num_cols] = scaler.transform(input_df[num_cols])
@@ -101,20 +91,13 @@ if submitted:
         st.error(f"Error during scaling: {e}")
         st.stop()
 
-    # C. Preprocessing - Encoding
-    # CRITICAL FIX: drop_first=False prevents data loss for single-row prediction
     input_encoded = pd.get_dummies(input_df, drop_first=False)
-
-    # D. Align Columns
-    # Ensure columns match the training data exactly
     input_encoded = input_encoded.reindex(columns=feature_columns, fill_value=0)
 
-    # E. Prediction
     try:
         prediction = model.predict(input_encoded)[0]
         probability = model.predict_proba(input_encoded)[0][1]
 
-        # --- 6. DISPLAY RESULT ---
         st.markdown("---")
         st.subheader("Prediction Result")
         
